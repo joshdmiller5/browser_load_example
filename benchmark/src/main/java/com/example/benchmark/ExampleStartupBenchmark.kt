@@ -206,6 +206,37 @@ class ExampleStartupBenchmark {
         }
     }
 
+    @Test
+    fun webview_cached_content_load_test() {
+        var fileName = "webview_cached_content"
+        var testURLs = urlsToLoad.toMutableList()
+        benchmarkRule.measureRepeated(
+            packageName = PACKAGE_NAME,
+            metrics = listOf(StartupTimingMetric()),
+            iterations = DEFAULT_ITERATIONS,
+            startupMode = StartupMode.COLD,
+            setupBlock = {
+                instrumentationContext = InstrumentationRegistry.getInstrumentation().context
+                pressHome()
+            }
+        ) {
+            val intent = Intent("$PACKAGE_NAME.MAIN_ACTIVITY")
+            if (testURLs.isNotEmpty()) {
+                intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
+            }
+            intent.putExtra("prefetch_and_cache", true)
+            startActivityAndWait(intent)
+            
+            // Wait for prefetch/cache to complete
+            
+            // Now start WebView with cached content
+            clickOnId("open_web_view")
+            Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the cached content to load
+            saveFile(fileName)
+            Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
+        }
+    }
+
     private fun MacrobenchmarkScope.saveFile(fileName: String) {
         val intent = Intent("$PACKAGE_NAME.PRINT_FILE")
         intent.putExtra("extra_log_to_file_name", fileName)

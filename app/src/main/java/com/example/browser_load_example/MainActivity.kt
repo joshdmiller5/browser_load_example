@@ -18,9 +18,11 @@ import androidx.webkit.PrefetchException
 import androidx.webkit.Profile
 import androidx.webkit.ProfileStore
 import androidx.webkit.SpeculativeLoadingParameters
-import androidx.webkit.WebViewFeature
-import androidx.webkit.WebViewFeature.PRECONNECT
-import com.example.browser_load_example.WebViewActivity.Companion.URL_PRECONNECT
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.net.HttpURLConnection
+import java.net.URL
 
 
 class MainActivity : AppCompatActivity() {
@@ -44,7 +46,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         val shouldPrewarm = intent.getBooleanExtra("prewarm_url", false)
-        val shouldPreconnect = intent .getBooleanExtra("use_preconnect", false)
+        val shouldPreconnect = intent.getBooleanExtra("use_preconnect", false)
+        val shouldPrefetchAndCache = intent.getBooleanExtra("prefetch_and_cache", false)
+
 
         findViewById<Button>(R.id.open_web_view).setOnClickListener {
             if (shouldPreconnect) {
@@ -92,6 +96,33 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 webView.loadUrl(url)
+            } else if (shouldPrefetchAndCache) {
+                Log.d("MainActivity", "Starting prefetch of: $url")
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val connection = URL(url).openConnection() as HttpURLConnection
+                        connection.requestMethod = "GET"
+                        connection.connectTimeout = 10000
+                        connection.readTimeout = 10000
+
+                        val responseCode = connection.responseCode
+                        if (responseCode == HttpURLConnection.HTTP_OK) {
+                            val html = connection.inputStream.bufferedReader().use { it.readText() }
+                            HtmlCache.cacheHtml(url, html)
+                            // Use cached content
+                            val intent = Intent(this@MainActivity, WebViewActivity::class.java)
+                            intent.putExtra(WebViewActivity.EXTRA_URL_TO_USE, url)
+                            intent.putExtra("use_cached_content", true)
+                            SessionHolder.startTimer()
+                            startActivity(intent)
+                            Log.d("MainActivity", "Successfully cached ${html.length} characters for $url")
+                        } else {
+                            Log.e("MainActivity", "Failed to fetch $url, response code: $responseCode")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Error prefetching $url", e)
+                    }
+                }
             } else {
                 val intent = Intent(this, WebViewActivity::class.java)
                 intent.putExtra(WebViewActivity.EXTRA_URL_TO_USE, url)
@@ -102,7 +133,24 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    object HtmlCache {
+        private var cachedUrl: String? = null
+        private var cachedHtml: String? = null
+        
+        fun cacheHtml(url: String, html: String) {
+            cachedUrl = url
+            cachedHtml = html
+        }
+        
+        fun getCachedHtml(url: String): String? {
+            return if (cachedUrl == url) cachedHtml else null
+        }
+        
+        fun clearCache() {
+            cachedUrl = null
+            cachedHtml = null
+        }
+    }
 
     companion object {
         const val EXTRA_URL_TO_USE = "extra_url_to_use"
