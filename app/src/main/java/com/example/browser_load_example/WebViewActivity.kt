@@ -1,14 +1,16 @@
 package com.example.browser_load_example
 
 import android.os.Bundle
-import android.util.Log
-import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.webkit.WebViewCompat
 
 class WebViewActivity : AppCompatActivity() {
     private var notSentYet = true
@@ -23,25 +25,49 @@ class WebViewActivity : AppCompatActivity() {
         }
 
         val myWebView: WebView = findViewById(R.id.webview)
-        myWebView.loadUrl(intent.getStringExtra(EXTRA_URL_TO_USE)!!)
-        myWebView.settings.javaScriptEnabled = true
-        myWebView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                Log.d("WebView", "onConsoleMessage: ${consoleMessage?.messageLevel()} ${consoleMessage?.message()}")
-                return super.onConsoleMessage(consoleMessage)
-            }
+        val shouldUseCache = intent.getBooleanExtra(PREWARM, false)
+        val shouldPreconnect = intent.getBooleanExtra(URL_PRECONNECT, false)
+        myWebView.settings.cacheMode = if (shouldUseCache || shouldPreconnect) WebSettings.LOAD_DEFAULT else WebSettings.LOAD_NO_CACHE
+        myWebView.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
 
+            // Additional performance settings
+            blockNetworkImage = false
+            loadsImagesAutomatically = true
+            mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+
+            // Enable modern web features
+            allowFileAccess = true
+            allowContentAccess = true
+            loadWithOverviewMode = true
+            useWideViewPort = true
+        }
+        myWebView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest?
+            ): Boolean {
+                return false
+            }
+        }
+        myWebView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
-                Log.d("WebView", "onProgressChanged: $newProgress")
                 if (newProgress == 100 && notSentYet) {
                     SessionHolder.browserPageLoaded()
                     notSentYet = false
                 }
             }
         }
+        if (shouldPreconnect) {
+            WebViewCompat.setProfile(myWebView, "TEST_PROFILE_1")
+        }
+        myWebView.loadUrl(intent.getStringExtra(EXTRA_URL_TO_USE)!!)
     }
 
     companion object {
         const val EXTRA_URL_TO_USE = "extra_url_to_use"
+        const val PREWARM = "should_prewarm"
+        const val URL_PRECONNECT = "should_preconnect"
     }
 }

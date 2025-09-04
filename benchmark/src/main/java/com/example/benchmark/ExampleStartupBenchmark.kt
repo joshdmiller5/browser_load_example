@@ -32,7 +32,7 @@ import org.junit.runner.RunWith
 const val DEFAULT_ITERATIONS = 72
 const val DEFAULT_WAIT_SESSION = 3000L
 const val DEFAULT_WAIT_URL_WARM = 1500L
-const val DEFAULT_WAIT_URL_LOAD = 9500L
+const val DEFAULT_WAIT_URL_LOAD = 15000L
 const val DEFAULT_WAIT_WRITE_TO_FILE = 1000L
 const val PACKAGE_NAME = "com.example.browser_load_example"
 var urlsToLoad = listOf(
@@ -123,7 +123,6 @@ class ExampleStartupBenchmark {
 
     lateinit var instrumentationContext: Context
 
-
     @Test
     fun webview_load_test() {
         var fileName = "webview"
@@ -143,7 +142,6 @@ class ExampleStartupBenchmark {
                 intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
             }
             startActivityAndWait(intent)
-            waitForServiceConnected() // Wait for the activity to be fully loaded
             Thread.sleep(DEFAULT_WAIT_URL_WARM)
             clickOnId("open_web_view")
             Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the web view to load
@@ -153,8 +151,8 @@ class ExampleStartupBenchmark {
     }
 
     @Test
-    fun chrome_customtab_load_test() {
-        var fileName = "chrome_customtab"
+    fun webview_prewarm_load_test() {
+        var fileName = "webview_prewarm"
         var testURLs = urlsToLoad.toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
@@ -170,10 +168,10 @@ class ExampleStartupBenchmark {
             if (testURLs.isNotEmpty()) {
                 intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
             }
+            intent.putExtra("prewarm_url", true)
             startActivityAndWait(intent)
-            waitForServiceConnected() // Wait for the activity to be fully loaded
             Thread.sleep(DEFAULT_WAIT_URL_WARM)
-            clickOnId("open_chrome_custom_tab")
+            clickOnId("open_web_view")
             Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the web view to load
             saveFile(fileName)
             Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
@@ -181,8 +179,8 @@ class ExampleStartupBenchmark {
     }
 
     @Test
-    fun customtab_test_without_warmup_without_prewarm() {
-        var fileName = "customtab_without_warmup_without_prewarm"
+    fun webview_preconnect_load_test() {
+        var fileName = "webview_preconnect_experimental"
         var testURLs = urlsToLoad.toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
@@ -198,42 +196,10 @@ class ExampleStartupBenchmark {
             if (testURLs.isNotEmpty()) {
                 intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
             }
-            intent.putExtra("extra_should_warmup", false)
-            intent.putExtra("extra_should_prewarm_url", false)
+            intent.putExtra("use_preconnect", true)
             startActivityAndWait(intent)
-            waitForServiceConnected() // Wait for the activity to be fully loaded
             Thread.sleep(DEFAULT_WAIT_URL_WARM)
-            clickOnId("open_chrome_custom_tab")
-            Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the web view to load
-            saveFile(fileName)
-            Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
-        }
-    }
-
-    @Test
-    fun customtab_test_with_warmup_without_prewarm() {
-        var fileName = "customtab_warmup_without_prewarm"
-        var testURLs = urlsToLoad.toMutableList()
-        benchmarkRule.measureRepeated(
-            packageName = PACKAGE_NAME,
-            metrics = listOf(StartupTimingMetric()),
-            iterations = DEFAULT_ITERATIONS,
-            startupMode = StartupMode.COLD,
-            setupBlock = {
-                instrumentationContext = InstrumentationRegistry.getInstrumentation().context
-                pressHome()
-            }
-        ) {
-            val intent = Intent("$PACKAGE_NAME.MAIN_ACTIVITY")
-            if (testURLs.isNotEmpty()) {
-                intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
-            }
-            intent.putExtra("extra_should_warmup", true)
-            intent.putExtra("extra_should_prewarm_url", false)
-            startActivityAndWait(intent)
-            waitForServiceConnected() // Wait for the activity to be fully loaded
-            Thread.sleep(DEFAULT_WAIT_URL_WARM)
-            clickOnId("open_chrome_custom_tab")
+            clickOnId("open_web_view")
             Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the web view to load
             saveFile(fileName)
             Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
@@ -259,9 +225,4 @@ class ExampleStartupBenchmark {
         Thread.sleep(100)
     }
 
-    private fun MacrobenchmarkScope.waitForServiceConnected() {
-        check(device.wait(Until.hasObject(By.checked(true)), DEFAULT_WAIT_SESSION)) {
-            "Checkmark not found after waiting $DEFAULT_WAIT_SESSION ms."
-        }
-    }
 }
