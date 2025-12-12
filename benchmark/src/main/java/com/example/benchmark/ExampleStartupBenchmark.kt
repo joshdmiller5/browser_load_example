@@ -2,7 +2,6 @@ package com.example.benchmark
 
 import android.content.Context
 import android.content.Intent
-import androidx.benchmark.macro.CompilationMode
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.StartupMode
 import androidx.benchmark.macro.StartupTimingMetric
@@ -12,9 +11,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
 import junit.framework.TestCase.fail
+import org.junit.FixMethodOrder
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 
 /**
  * This is an example startup benchmark.
@@ -29,11 +30,12 @@ import org.junit.runner.RunWith
  * for investigating your app's performance.
  */
 
-const val DEFAULT_ITERATIONS = 72
+const val DEFAULT_ITERATIONS = 72 + 72
 const val DEFAULT_WAIT_SESSION = 3000L
 const val DEFAULT_WAIT_URL_WARM = 1500L
 const val DEFAULT_WAIT_URL_LOAD = 15000L
 const val DEFAULT_WAIT_WRITE_TO_FILE = 1000L
+const val DNS_CACHE_WAIT_TIME = 3600_000L // 60 minutes to ensure DNS cache expires
 const val PACKAGE_NAME = "com.example.browser_load_example"
 var urlsToLoad = listOf(
     "https://www.google.com",
@@ -117,6 +119,7 @@ var urlsToLoad = listOf(
     "https://www.burberry.com",
 )
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class ExampleStartupBenchmark {
     @get:Rule
     val benchmarkRule = MacrobenchmarkRule()
@@ -124,9 +127,9 @@ class ExampleStartupBenchmark {
     lateinit var instrumentationContext: Context
 
     @Test
-    fun webview_load_test() {
+    fun c_webview_load_test() {
         var fileName = "webview"
-        var testURLs = urlsToLoad.toMutableList()
+        var testURLs = (urlsToLoad + urlsToLoad).toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -151,9 +154,9 @@ class ExampleStartupBenchmark {
     }
 
     @Test
-    fun webview_prewarm_load_test() {
-        var fileName = "webview_prewarm"
-        var testURLs = urlsToLoad.toMutableList()
+    fun a_webview_preconnect_load_test() {
+        var fileName = "webview_preconnect"
+        var testURLs = (urlsToLoad + urlsToLoad).toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -176,12 +179,15 @@ class ExampleStartupBenchmark {
             saveFile(fileName)
             Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
         }
+
+        // Wait for DNS cache to expire before next test
+        Thread.sleep(DNS_CACHE_WAIT_TIME)
     }
 
     @Test
-    fun webview_preconnect_load_test() {
-        var fileName = "webview_preconnect_experimental"
-        var testURLs = urlsToLoad.toMutableList()
+    fun b_webview_preconnect_with_cct_load_test() {
+        var fileName = "webview_preconnect_with_cct"
+        var testURLs = (urlsToLoad + urlsToLoad).toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -196,7 +202,7 @@ class ExampleStartupBenchmark {
             if (testURLs.isNotEmpty()) {
                 intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
             }
-            intent.putExtra("use_preconnect", true)
+            intent.putExtra("cct_prewarm_url", true)
             startActivityAndWait(intent)
             Thread.sleep(DEFAULT_WAIT_URL_WARM)
             clickOnId("open_web_view")
@@ -204,12 +210,15 @@ class ExampleStartupBenchmark {
             saveFile(fileName)
             Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
         }
+
+        // Wait for DNS cache to expire before next test
+        Thread.sleep(DNS_CACHE_WAIT_TIME)
     }
 
     @Test
-    fun webview_cached_content_load_test() {
-        var fileName = "webview_cached_content"
-        var testURLs = urlsToLoad.toMutableList()
+    fun d_webview_preconnect_with_okhttp_load_test() {
+        var fileName = "webview_preconnect_with_okhttp"
+        var testURLs = (urlsToLoad + urlsToLoad).toMutableList()
         benchmarkRule.measureRepeated(
             packageName = PACKAGE_NAME,
             metrics = listOf(StartupTimingMetric()),
@@ -224,17 +233,17 @@ class ExampleStartupBenchmark {
             if (testURLs.isNotEmpty()) {
                 intent.putExtra("extra_url_to_use", testURLs.removeAt(0))
             }
-            intent.putExtra("prefetch_and_cache", true)
+            intent.putExtra("okhttp_prewarm_url", true)
             startActivityAndWait(intent)
-            
-            // Wait for prefetch/cache to complete
-            
-            // Now start WebView with cached content
+            Thread.sleep(DEFAULT_WAIT_URL_WARM)
             clickOnId("open_web_view")
-            Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the cached content to load
+            Thread.sleep(DEFAULT_WAIT_URL_LOAD) // Wait for the web view to load
             saveFile(fileName)
             Thread.sleep(DEFAULT_WAIT_WRITE_TO_FILE) // Wait for the file to be saved
         }
+
+        // Wait for DNS cache to expire before next test
+        Thread.sleep(DNS_CACHE_WAIT_TIME)
     }
 
     private fun MacrobenchmarkScope.saveFile(fileName: String) {

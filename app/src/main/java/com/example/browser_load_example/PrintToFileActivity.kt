@@ -49,7 +49,7 @@ class PrintToFileActivity : AppCompatActivity() {
             MediaStore.MediaColumns.DISPLAY_NAME,
         )
         val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
-        val selectionArgs = arrayOf("${fileName}_9.txt")
+        val selectionArgs = arrayOf("${fileName}_90.txt")
         val cursor =
             context.contentResolver.query(extVolumeUri, projection, selection, selectionArgs, null)
                 ?: return
@@ -72,7 +72,7 @@ class PrintToFileActivity : AppCompatActivity() {
         } else {
             // File does not exist, create a new one
             val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, "${fileName}_9")
+                put(MediaStore.MediaColumns.DISPLAY_NAME, "${fileName}_90")
                 put(MediaStore.MediaColumns.MIME_TYPE, "text/plain")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
             }
